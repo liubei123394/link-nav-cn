@@ -77,13 +77,27 @@
     background: #f0eef5; color: #764ba2; padding: 4px 14px; border-radius: 20px;
     font-size: 14px; font-weight: 500;
   }
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-80px);
+    background: #ff4757; color: #fff; padding: 12px 28px; border-radius: 10px;
+    font-size: 15px; font-weight: 500; box-shadow: 0 6px 24px rgba(255,71,87,.3);
+    z-index: 999; opacity: 0; transition: all .35s cubic-bezier(.17,.89,.32,1.49);
+    pointer-events: none;
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .warn-line {
+    color: #ff4757; font-size: 13px; margin-top: 6px; text-align: left;
+    min-height: 20px;
+  }
 </style>
 </head>
 <body>
+<div class="toast" id="toast"></div>
 <div class="container">
   <h1>🎲 随机选人</h1>
-  <textarea id="names" placeholder="输入候选人名单，每行一个名字…&#10;张三&#10;李四&#10;王五&#10;赵六&#10;孙七"></textarea>
-  <p class="hint">每行一个名字，也支持逗号或空格分隔</p>
+  <textarea id="names" placeholder="输入候选人名单，每行一个名字…&#10;张三&#10;李四&#10;王五"></textarea>
+  <p class="hint">每行一个名字，也支持逗号或空格分隔。纯数字、纯英文不算人名</p>
+  <div class="warn-line" id="warnLine"></div>
   <div class="pick-row">
     <label for="pickCount">一次选</label>
     <input type="number" id="pickCount" value="1" min="1" max="99">
@@ -106,9 +120,37 @@
   const displayArea = document.getElementById('displayArea');
   const btnRow = document.getElementById('btnRow');
 
+  // 纯数字、纯英文字母、数字+字母混合 → 都不算人名
+  function isNotPersonName(s) {
+    return /^[a-zA-Z\d.]+$/.test(s.trim());
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2500);
+  }
+
   function parseNames() {
     const raw = document.getElementById('names').value.trim();
-    return raw.split(/[,，\n\s]+/).map(s => s.trim()).filter(Boolean);
+    const all = raw.split(/[,，\n\s]+/).map(s => s.trim()).filter(Boolean);
+    const valid = [];
+    const rejected = [];
+    all.forEach(s => {
+      if (isNotPersonName(s)) {
+        rejected.push(s);
+      } else {
+        valid.push(s);
+      }
+    });
+    const warnLine = document.getElementById('warnLine');
+    if (rejected.length > 0) {
+      warnLine.textContent = `⚠ 已忽略非人名项：${rejected.join('、')}`;
+    } else {
+      warnLine.textContent = '';
+    }
+    return valid;
   }
 
   function getPickCount() {
@@ -121,7 +163,6 @@
   }
 
   function rollFrame(timestamp) {
-    // 每100ms更新一次文字，避免DOM操作太频繁
     if (timestamp - lastUpdate >= 80) {
       lastUpdate = timestamp;
       const tags = displayArea.querySelectorAll('.name-tag');
@@ -137,11 +178,16 @@
   function startRoll() {
     names = parseNames();
     const count = getPickCount();
-    if (names.length < 2) return alert('至少输入2个名字哦');
-    if (count > names.length) return alert(`只有 ${names.length} 人，选不了 ${count} 个`);
+    if (names.length < 2) {
+      showToast('至少输入2个人名（纯数字、纯英文不算）');
+      return;
+    }
+    if (count > names.length) {
+      showToast(`只有 ${names.length} 人，选不了 ${count} 个`);
+      return;
+    }
 
     isRolling = true;
-    // 创建滚动标签
     displayArea.innerHTML = '';
     for (let i = 0; i < count; i++) {
       const tag = document.createElement('span');
@@ -149,8 +195,7 @@
       tag.textContent = names[Math.floor(Math.random() * names.length)];
       displayArea.appendChild(tag);
     }
-    // 切换按钮
-    btnRow.innerHTML = '<button class="btn-stop" id="stopBtn" onclick="stopRoll()">停！</button>';
+    btnRow.innerHTML = '<button class="btn-stop" onclick="stopRoll()">停！</button>';
 
     lastUpdate = 0;
     rafId = requestAnimationFrame(rollFrame);
@@ -164,7 +209,6 @@
     const chosen = pickRandom(names, count);
     const tags = displayArea.querySelectorAll('.name-tag');
 
-    // 依次弹出
     tags.forEach((tag, i) => {
       setTimeout(() => {
         tag.textContent = chosen[i];
@@ -173,7 +217,6 @@
       }, i * 150);
     });
 
-    // 记录历史
     roundCount++;
     const historyBox = document.getElementById('historyBox');
     const historyList = document.getElementById('historyList');
@@ -186,18 +229,20 @@
     `;
     historyList.prepend(roundDiv);
 
-    // 恢复按钮
     setTimeout(() => {
       btnRow.innerHTML = '<button class="btn-start" onclick="startRoll()">再来一次</button>';
     }, Math.min(count * 150, 1500));
   }
 
-  // 键盘支持：空格也能停
   document.addEventListener('keydown', e => {
     if (e.code === 'Space' && isRolling) {
       e.preventDefault();
       stopRoll();
     }
+  });
+
+  document.getElementById('names').addEventListener('input', () => {
+    parseNames();
   });
 </script>
 </body>
