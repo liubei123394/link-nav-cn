@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>投票站</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+    min-height: 100vh; display: flex; justify-content: center; align-items: flex-start;
+    padding: 40px 16px;
+  }
+  .container {
+    background: #fff; border-radius: 16px; padding: 36px; width: 90%; max-width: 520px;
+    box-shadow: 0 20px 60px rgba(0,0,0,.15);
+  }
+  h1 { font-size: 26px; margin-bottom: 8px; color: #333; text-align: center; }
+  .subtitle { font-size: 13px; color: #999; text-align: center; margin-bottom: 28px; }
+  .section { margin-bottom: 24px; }
+  .section-title {
+    font-size: 15px; font-weight: 600; color: #555; margin-bottom: 10px;
+    padding-bottom: 6px; border-bottom: 2px solid #f0f0f0;
+  }
+  textarea {
+    width: 100%; height: 100px; border: 2px solid #e0e0e0; border-radius: 10px;
+    padding: 12px; font-size: 16px; resize: none; outline: none;
+    transition: border-color .3s;
+  }
+  textarea:focus { border-color: #11998e; }
+  .hint { font-size: 12px; color: #999; margin: 6px 0 0; text-align: left; }
+  .warn-line { color: #ff4757; font-size: 13px; margin-top: 6px; min-height: 20px; }
+  .voter-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .voter-row label { font-size: 15px; color: #555; font-weight: 500; white-space: nowrap; }
+  .voter-row input {
+    flex: 1; padding: 10px 14px; font-size: 16px; border: 2px solid #e0e0e0;
+    border-radius: 8px; outline: none; transition: border-color .3s;
+  }
+  .voter-row input:focus { border-color: #11998e; }
+  .candidates {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
+  }
+  .cand-card {
+    flex: 1; min-width: 120px; padding: 16px; border: 2px solid #e8e8e8;
+    border-radius: 12px; text-align: center; cursor: pointer;
+    transition: all .25s; position: relative;
+  }
+  .cand-card:hover { border-color: #11998e; transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(17,153,142,.15); }
+  .cand-card.voted { border-color: #11998e; background: #f0faf9; }
+  .cand-card .cand-name { font-size: 20px; font-weight: 700; color: #333; margin-bottom: 6px; }
+  .cand-card .cand-count { font-size: 28px; font-weight: 800; color: #11998e; }
+  .cand-card .cand-label { font-size: 11px; color: #aaa; }
+  .cand-card .check-mark {
+    position: absolute; top: 8px; right: 10px; font-size: 18px; opacity: 0;
+    transition: opacity .2s;
+  }
+  .cand-card.voted .check-mark { opacity: 1; }
+  button {
+    padding: 12px 36px; font-size: 16px; border: none; border-radius: 50px;
+    cursor: pointer; font-weight: 600; transition: all .3s;
+    touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  }
+  .btn-confirm {
+    background: linear-gradient(135deg, #11998e, #38ef7d); color: #fff;
+    width: 100%; padding: 14px; font-size: 17px;
+  }
+  .btn-confirm:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(17,153,142,.3); }
+  .btn-confirm:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-reset {
+    background: #f5f5f5; color: #888; margin-top: 10px; font-size: 14px;
+  }
+  .btn-reset:hover { background: #eee; }
+  .voted-list { margin-top: 16px; }
+  .voted-list h4 { font-size: 13px; color: #aaa; margin-bottom: 6px; }
+  .voted-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .voted-tags span {
+    background: #f0faf9; color: #11998e; padding: 3px 12px; border-radius: 16px;
+    font-size: 13px; font-weight: 500;
+  }
+  .toast {
+    position: fixed; top: 24px; left: 50%; transform: translateX(-50%) translateY(-80px);
+    color: #fff; padding: 12px 28px; border-radius: 10px;
+    font-size: 15px; font-weight: 500; box-shadow: 0 6px 24px rgba(0,0,0,.2);
+    z-index: 999; opacity: 0; transition: all .35s cubic-bezier(.17,.89,.32,1.49);
+    pointer-events: none;
+  }
+  .toast.error { background: #ff4757; }
+  .toast.success { background: #11998e; }
+  .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+  .result-bar {
+    margin-top: 4px; height: 6px; border-radius: 3px; background: #eee; overflow: hidden;
+  }
+  .result-bar-fill {
+    height: 100%; border-radius: 3px; background: linear-gradient(90deg, #11998e, #38ef7d);
+    transition: width .6s cubic-bezier(.17,.89,.32,1.49);
+  }
+  .no-cand { color: #ccc; font-size: 14px; padding: 20px; text-align: center; }
+</style>
+</head>
+<body>
+<div class="toast" id="toast"></div>
+<div class="container">
+  <h1>🗳️ 投票站</h1>
+  <p class="subtitle">输入候选人，每人只能投一票</p>
+
+  <!-- 候选人设置 -->
+  <div class="section">
+    <div class="section-title">候选人名单</div>
+    <textarea id="candInput" placeholder="输入候选人名字，每行一个…&#10;张三&#10;李四&#10;王五"></textarea>
+    <p class="hint">每行一个名字，支持逗号或空格分隔。纯数字、纯英文不算人名</p>
+    <div class="warn-line" id="candWarn"></div>
+    <button class="btn-confirm" style="margin-top:12px" onclick="initCandidates()">确认候选人</button>
+  </div>
+
+  <!-- 投票区 -->
+  <div class="section" id="voteSection" style="display:none">
+    <div class="section-title">投票</div>
+    <div class="voter-row">
+      <label>投票人：</label>
+      <input type="text" id="voterName" placeholder="输入你的名字">
+    </div>
+    <div class="warn-line" id="voterWarn"></div>
+    <div class="candidates" id="candList"></div>
+    <button class="btn-confirm" id="voteBtn" disabled onclick="submitVote()">请选择候选人</button>
+  </div>
+
+  <!-- 已投票记录 -->
+  <div class="section" id="votedSection" style="display:none">
+    <div class="section-title">已投票</div>
+    <div class="voted-list">
+      <div class="voted-tags" id="votedTags"></div>
+    </div>
+  </div>
+
+  <!-- 重置 -->
+  <div style="text-align:center" id="resetWrap" style="display:none">
+    <button class="btn-reset" onclick="resetAll()">重新开始</button>
+  </div>
+</div>
+<script>
+  let candidates = []; // [{name, count}]
+  let votedSet = new Set(); // 已投票人名
+  let selectedIdx = -1;
+
+  function isNotPersonName(s) {
+    return /^[a-zA-Z\d.]+$/.test(s.trim());
+  }
+
+  function showToast(msg, type = 'error') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type;
+    setTimeout(() => t.classList.add('show'), 10);
+    setTimeout(() => t.classList.remove('show'), 2600);
+  }
+
+  function initCandidates() {
+    const raw = document.getElementById('candInput').value.trim();
+    if (!raw) return showToast('请输入候选人');
+    const all = raw.split(/[,，\n\s]+/).map(s => s.trim()).filter(Boolean);
+    const valid = [];
+    const rejected = [];
+    all.forEach(s => {
+      if (isNotPersonName(s)) rejected.push(s);
+      else valid.push(s);
+    });
+    const warnEl = document.getElementById('candWarn');
+    if (rejected.length > 0) {
+      warnEl.textContent = `⚠ 已忽略非人名项：${rejected.join('、')}`;
+    } else {
+      warnEl.textContent = '';
+    }
+    // 去重
+    const unique = [...new Set(valid)];
+    if (unique.length < 2) return showToast('至少需要2位候选人');
+    candidates = unique.map(name => ({ name, count: 0 }));
+    votedSet.clear();
+    selectedIdx = -1;
+    renderCandidates();
+    document.getElementById('voteSection').style.display = 'block';
+    document.getElementById('votedSection').style.display = 'none';
+    document.getElementById('resetWrap').style.display = 'block';
+    showToast('候选人设置成功！', 'success');
+  }
+
+  function renderCandidates() {
+    const list = document.getElementById('candList');
+    const total = candidates.reduce((s, c) => s + c.count, 0);
+    const maxCount = Math.max(...candidates.map(c => c.count), 1);
+    list.innerHTML = candidates.map((c, i) => {
+      const pct = total > 0 ? (c.count / total * 100).toFixed(0) : 0;
+      const barW = maxCount > 0 ? (c.count / maxCount * 100) : 0;
+      return `
+        <div class="cand-card ${selectedIdx === i ? 'voted' : ''}" onclick="selectCand(${i})">
+          <span class="check-mark">✅</span>
+          <div class="cand-name">${c.name}</div>
+          <div class="cand-count">${c.count}</div>
+          <div class="cand-label">票 · ${pct}%</div>
+          <div class="result-bar"><div class="result-bar-fill" style="width:${barW}%"></div></div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  function selectCand(idx) {
+    selectedIdx = idx;
+    renderCandidates();
+    const btn = document.getElementById('voteBtn');
+    btn.disabled = false;
+    btn.textContent = `投给「${candidates[idx].name}」`;
+  }
+
+  function submitVote() {
+    const voterRaw = document.getElementById('voterName').value.trim();
+    const voterWarn = document.getElementById('voterWarn');
+    // 校验投票人
+    if (!voterRaw) {
+      voterWarn.textContent = '⚠ 请输入你的名字';
+      return;
+    }
+    if (isNotPersonName(voterRaw)) {
+      voterWarn.textContent = '⚠ 投票人名字不能是纯数字或纯英文';
+      return;
+    }
+    // 重复投票检测
+    if (votedSet.has(voterRaw)) {
+      voterWarn.textContent = `⚠「${voterRaw}」已经投过票了`;
+      showToast('每人只能投一次哦');
+      return;
+    }
+    voterWarn.textContent = '';
+    if (selectedIdx < 0) return;
+
+    // 投票
+    candidates[selectedIdx].count++;
+    votedSet.add(voterRaw);
+    showToast(`「${voterRaw}」投票成功！`, 'success');
+
+    // 清空选择
+    document.getElementById('voterName').value = '';
+    selectedIdx = -1;
+    const btn = document.getElementById('voteBtn');
+    btn.disabled = true;
+    btn.textContent = '请选择候选人';
+
+    renderCandidates();
+    renderVotedList();
+  }
+
+  function renderVotedList() {
+    const section = document.getElementById('votedSection');
+    const tags = document.getElementById('votedTags');
+    if (votedSet.size === 0) { section.style.display = 'none'; return; }
+    section.style.display = 'block';
+    tags.innerHTML = [...votedSet].map(n => `<span>${n}</span>`).join('');
+  }
+
+  function resetAll() {
+    candidates = [];
+    votedSet.clear();
+    selectedIdx = -1;
+    document.getElementById('candInput').value = '';
+    document.getElementById('candWarn').textContent = '';
+    document.getElementById('voteSection').style.display = 'none';
+    document.getElementById('votedSection').style.display = 'none';
+    document.getElementById('resetWrap').style.display = 'none';
+  }
+
+  // 实时校验候选人输入
+  document.getElementById('candInput').addEventListener('input', function() {
+    const all = this.value.split(/[,，\n\s]+/).map(s => s.trim()).filter(Boolean);
+    const rejected = all.filter(s => isNotPersonName(s));
+    document.getElementById('candWarn').textContent =
+      rejected.length > 0 ? `⚠ 将被忽略：${rejected.join('、')}` : '';
+  });
+
+  // 投票人输入实时校验
+  document.getElementById('voterName').addEventListener('input', function() {
+    const v = this.value.trim();
+    const w = document.getElementById('voterWarn');
+    if (v && isNotPersonName(v)) w.textContent = '⚠ 名字不能是纯数字或纯英文';
+    else if (votedSet.has(v)) w.textContent = `⚠「${v}」已投过票`;
+    else w.textContent = '';
+  });
+</script>
+</body>
+</html>
