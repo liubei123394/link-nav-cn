@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简易天气查询工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: "Microsoft Yahei", sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #74b9ff, #0984e3);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .weather-box {
+            background: #fff;
+            width: 100%;
+            max-width: 420px;
+            padding: 35px 28px;
+            border-radius: 16px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+        }
+        h1 {
+            text-align: center;
+            color: #2d3436;
+            margin-bottom: 28px;
+            font-size: 24px;
+        }
+        .search-area {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 25px;
+        }
+        #city-input {
+            flex: 1;
+            padding: 12px 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            outline: none;
+        }
+        #city-input:focus {
+            border-color: #0984e3;
+        }
+        #search-btn {
+            padding: 12px 20px;
+            background-color: #0984e3;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        #search-btn:hover {
+            background-color: #076bb8;
+        }
+        .info-area {
+            font-size: 17px;
+            color: #2d3436;
+            line-height: 2.2;
+        }
+        .tip-text {
+            color: #636e72;
+            text-align: center;
+        }
+        .error-tip {
+            color: #d63031;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="weather-box">
+        <h1>城市天气查询</h1>
+        <div class="search-area">
+            <input type="text" id="city-input" placeholder="输入中文城市，例如 北京、郑州">
+            <button id="search-btn">查询</button>
+        </div>
+        <div class="info-area" id="result-box">
+            <p class="tip-text">输入城市后点击查询获取天气</p >
+        </div>
+    </div>
+
+    <script>
+        const inputEl = document.getElementById('city-input');
+        const btnEl = document.getElementById('search-btn');
+        const resultBox = document.getElementById('result-box');
+
+        btnEl.addEventListener('click', getWeather);
+        inputEl.addEventListener('keydown', e => e.key === 'Enter' && getWeather());
+
+        async function getWeather() {
+            const city = inputEl.value.trim();
+            if (!city) {
+                resultBox.innerHTML = `<p class="error-tip">请输入城市名称！</p >`;
+                return;
+            }
+            resultBox.innerHTML = `<p class="tip-text">正在加载...</p >`;
+            try {
+                // 使用免费跨域代理解决本地html跨域报错
+                const proxyUrl = "https://corsproxy.io/?";
+                // 免费国内天气接口
+                const targetApi = `https://wttr.in/${encodeURIComponent(city)}?format=j1&lang=zh`;
+                const res = await fetch(proxyUrl + encodeURIComponent(targetApi));
+
+                if (!res.ok) throw new Error("接口请求失败");
+                const data = await res.json();
+
+                const cityName = data.nearest_area[0].areaName[0].value;
+                const temp = data.current_condition[0].temp_C;
+                const weatherText = data.current_condition[0].lang_zh[0].value;
+                const humidity = data.current_condition[0].humidity;
+
+                resultBox.innerHTML = `
+                    <p>📍 城市：${cityName}</p >
+                    <p>🌡️ 当前温度：${temp} ℃</p >
+                    <p>☁️ 天气状况：${weatherText}</p >
+                    <p>💧 空气湿度：${humidity} %</p >
+                `;
+            } catch (err) {
+                resultBox.innerHTML = `<p class="error-tip">查询失败：${err.message}，换一个城市试试</p >`;
+            }
+        }
+    </script>
+</body>
+</html>
